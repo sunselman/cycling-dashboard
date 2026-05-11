@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cycling Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.7/chart.umd.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0e1117;--bg2:#161b22;--bg3:#1c2129;--bg4:#21262d;
+  --tx:#e6edf3;--tx2:#9aa5b4;--tx3:#626d7a;
+  --bd:#30363d;--bd2:#21262d;
+  --green:#2ea66a;--green2:#1a7f4b;--greenA:rgba(46,166,106,.12);
+  --blue:#58a6ff;--blueA:rgba(88,166,255,.1);
+  --orange:#d18616;--orangeA:rgba(209,134,22,.1);
+  --red:#da3633;--redA:rgba(218,54,51,.1);
+  --pink:#db61a2;--pinkA:rgba(219,97,162,.1);
+  --purple:#a78bfa;--purpleA:rgba(167,139,250,.1);
+  --yellow:#e3b341;
+  --r:10px;
+}
+body{font-family:'DM Sans',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--tx);min-height:100vh;line-height:1.4}
+.wrap{max-width:820px;margin:0 auto;padding:24px 20px 60px}
+
+/* Upload */
+.upload-zone{border:2px dashed var(--bd);border-radius:var(--r);padding:48px 24px;text-align:center;cursor:pointer;transition:all .2s;margin-bottom:24px;position:relative}
+.upload-zone:hover,.upload-zone.drag{border-color:var(--green);background:var(--greenA)}
+.upload-zone h2{font-size:18px;font-weight:500;margin-bottom:6px}
+.upload-zone p{color:var(--tx2);font-size:13px}
+.upload-zone input{position:absolute;inset:0;opacity:0;cursor:pointer}
+
+/* File list */
+.file-list{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px}
+.file-chip{display:flex;align-items:center;gap:8px;background:var(--bg3);border:1px solid var(--bd);border-radius:999px;padding:6px 14px;font-size:12px;cursor:pointer;transition:all .15s}
+.file-chip:hover{border-color:var(--tx3)}
+.file-chip.active{border-color:var(--green);background:var(--greenA);color:var(--green)}
+.file-chip .count{color:var(--tx3);font-variant-numeric:tabular-nums}
+.file-chip .remove{color:var(--tx3);font-size:14px;line-height:1;margin-left:2px;cursor:pointer;border:none;background:none;padding:0}
+.file-chip .remove:hover{color:var(--red)}
+
+/* Time range */
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:24px}
+.pill-group{display:flex;gap:0;background:var(--bg3);border-radius:999px;padding:3px}
+.pill{border:none;background:transparent;color:var(--tx3);font-family:inherit;font-size:11px;font-weight:500;padding:5px 12px;border-radius:999px;cursor:pointer;transition:all .12s}
+.pill.on{background:var(--tx);color:var(--bg)}
+input[type="date"]{font-family:inherit;font-size:11px;background:var(--bg3);color:var(--tx2);border:1px solid var(--bd);border-radius:6px;padding:5px 10px}
+
+/* KPI grid */
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--bd);border-radius:var(--r);overflow:hidden;margin-bottom:28px}
+.kpi{padding:16px 18px;border-right:1px solid var(--bd);border-bottom:1px solid var(--bd)}
+.kpi:nth-child(4n){border-right:none}
+.kpi:nth-child(n+5){border-bottom:none}
+.kpi-label{font-size:10px;font-weight:600;color:var(--tx3);letter-spacing:.06em;text-transform:uppercase;margin-bottom:5px}
+.kpi-val{font-size:26px;font-weight:500;letter-spacing:-.02em;line-height:1}
+.kpi-unit{font-size:12px;font-weight:400;color:var(--tx3);margin-left:4px}
+.kpi-sub{font-size:10px;color:var(--tx3);margin-top:4px}
+
+/* Tabs */
+.tabs{display:flex;gap:0;margin-bottom:24px;border-bottom:1px solid var(--bd)}
+.tab{background:none;border:none;border-bottom:2px solid transparent;padding:8px 20px;font-family:inherit;font-size:13px;font-weight:400;color:var(--tx3);cursor:pointer;transition:all .12s}
+.tab.on{color:var(--tx);font-weight:600;border-bottom-color:var(--tx)}
+
+/* Section headers */
+.sec-title{font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--tx3);margin-bottom:10px;margin-top:28px}
+.sec-sub{font-size:11px;color:var(--tx3);margin-top:-6px;margin-bottom:10px}
+
+/* Charts */
+.chart-wrap{position:relative;margin-bottom:4px}
+canvas{width:100%!important}
+
+/* Phase bar */
+.phase-bar{display:flex;gap:0;border-radius:8px;overflow:hidden;height:26px;margin-top:24px;margin-bottom:4px}
+.phase-bar div{display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600}
+
+/* Heatmap */
+.heatmap{display:flex;gap:2px;overflow-x:auto;padding-bottom:6px}
+.hm-col{display:flex;flex-direction:column;gap:2px}
+.hm-cell{width:9px;height:9px;border-radius:2px}
+
+/* HR zones */
+.zone-bar{display:flex;height:16px;border-radius:8px;overflow:hidden;margin-bottom:8px}
+.zone-row{display:flex;align-items:center;gap:8px;font-size:11px;margin-bottom:4px}
+.zone-dot{width:7px;height:7px;border-radius:2px;flex-shrink:0}
+.zone-pct{font-weight:600;font-variant-numeric:tabular-nums;margin-left:auto}
+
+/* Table */
+.log-wrap{border:1px solid var(--bd);border-radius:var(--r);overflow:hidden}
+.log-scroll{max-height:520px;overflow-y:auto}
+.log-table{width:100%;border-collapse:collapse;font-size:12px}
+.log-table thead{position:sticky;top:0;z-index:1}
+.log-table th{background:var(--bg3);padding:9px 8px;text-align:left;font-size:9px;font-weight:600;color:var(--tx3);letter-spacing:.05em;text-transform:uppercase;border-bottom:1px solid var(--bd)}
+.log-table td{padding:8px;border-bottom:1px solid var(--bd2);font-variant-numeric:tabular-nums}
+.log-table tr:hover td{background:var(--bg2)}
+.log-table input[type="checkbox"]{width:14px;height:14px;margin:0}
+.phase-pill{display:inline-block;padding:2px 8px;border-radius:99px;font-size:9px;font-weight:600;letter-spacing:.03em}
+
+/* Legend */
+.legend{display:flex;gap:14px;justify-content:center;margin-top:28px;padding-top:14px;border-top:1px solid var(--bd);flex-wrap:wrap}
+.legend span{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--tx3);font-weight:500}
+.legend-dot{width:8px;height:8px;border-radius:2px;display:inline-block}
+
+/* Empty state */
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:300px;color:var(--tx3)}
+.empty svg{margin-bottom:16px;opacity:.4}
+.empty p{font-size:14px}
+
+/* Responsive */
+@media(max-width:600px){
+  .kpi-grid{grid-template-columns:repeat(2,1fr)}
+  .kpi:nth-child(2n){border-right:none}
+  .kpi:nth-child(n+3){border-bottom:1px solid var(--bd)}
+  .kpi:nth-child(n+7){border-bottom:none}
+  .controls{flex-direction:column;align-items:flex-start}
+}
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+  <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:24px">
+    <div>
+      <div style="font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--tx3);margin-bottom:3px">Cycling Analytics</div>
+      <div style="font-size:22px;font-weight:500">Fitness-Dashboard</div>
+    </div>
+    <div id="score-display" style="text-align:right;display:none">
+      <div style="display:flex;align-items:baseline;justify-content:flex-end;gap:3px">
+        <span id="score-val" style="font-size:38px;font-weight:500;letter-spacing:-.03em;line-height:1"></span>
+        <span style="font-size:13px;color:var(--tx3)">/100</span>
+      </div>
+      <div id="score-sub" style="font-size:10px;color:var(--tx3);margin-top:2px"></div>
+    </div>
+  </div>
+
+  <!-- Upload -->
+  <div class="upload-zone" id="upload-zone">
+    <h2>Garmin CSV hochladen</h2>
+    <p>Drag & Drop oder klicken · Activities.csv von Garmin Connect</p>
+    <input type="file" accept=".csv" multiple id="file-input">
+  </div>
+
+  <!-- File chips -->
+  <div class="file-list" id="file-list"></div>
+
+  <!-- Dashboard (hidden until data) -->
+  <div id="dashboard" style="display:none">
+    <!-- Time controls -->
+    <div class="controls">
+      <div class="pill-group" id="presets"></div>
+      <input type="date" id="from-date">
+      <span style="color:var(--tx3);font-size:11px">–</span>
+      <input type="date" id="to-date">
+      <span style="color:var(--tx3);font-size:11px;margin-left:8px" id="range-info"></span>
+    </div>
+
+    <!-- KPIs -->
+    <div class="kpi-grid" id="kpi-grid"></div>
+
+    <!-- Tabs -->
+    <div class="tabs" id="tabs"></div>
+
+    <!-- Tab content -->
+    <div id="tab-content"></div>
+
+    <!-- Legend -->
+    <div class="legend">
+      <span><span class="legend-dot" style="background:#AFA9EC"></span>Einstieg</span>
+      <span><span class="legend-dot" style="background:#88DCBC"></span>Aufbau</span>
+      <span><span class="legend-dot" style="background:#44C495"></span>Peak</span>
+      <span><span class="legend-dot" style="background:#F5C260"></span>Indoor</span>
+      <span><span class="legend-dot" style="background:#EB8585"></span>Pause</span>
+      <span><span class="legend-dot" style="background:#6BABDF"></span>Comeback</span>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ═══ STATE ═══ */
+const state = {
+  files: [],          // [{name, data:[{id,d,t,typ,title,km,s,hr,v,hm,rpm,cal}]}]
+  activeFile: -1,
+  fromDate: '',
+  toDate: '',
+  preset: 0,
+  view: 'monthly',
+  metric: 'km',
+  tab: 'overview',
+  charts: {},
+  excluded: new Set(), // set of activity IDs to exclude
+};
+
+/* ═══ PHASE CONFIG ═══ */
+const PHASES = [
+  {ym:"2025-06",name:"Einstieg",bg:"#AFA9EC",fg:"#5B4FC7"},
+  {ym:"2025-07",name:"Aufbau",bg:"#88DCBC",fg:"#137A5E"},
+  {ym:"2025-08",name:"Peak",bg:"#44C495",fg:"#0C5E3F"},
+  {ym:"2025-09",name:"Peak",bg:"#44C495",fg:"#0C5E3F"},
+  {ym:"2025-10",name:"Indoor",bg:"#F5C260",fg:"#8A5A0C"},
+  {ym:"2025-11",name:"Indoor",bg:"#F5C260",fg:"#8A5A0C"},
+  {ym:"2025-12",name:"Indoor",bg:"#F5C260",fg:"#8A5A0C"},
+  {ym:"2026-01",name:"Pause",bg:"#EB8585",fg:"#8B2222"},
+  {ym:"2026-02",name:"Comeback",bg:"#6BABDF",fg:"#114E80"},
+  {ym:"2026-03",name:"Comeback",bg:"#6BABDF",fg:"#114E80"},
+  {ym:"2026-04",name:"Comeback",bg:"#6BABDF",fg:"#114E80"},
+  {ym:"2026-05",name:"Comeback",bg:"#6BABDF",fg:"#114E80"},
+  {ym:"2026-06",name:"Comeback",bg:"#6BABDF",fg:"#114E80"},
+  {ym:"2026-07",name:"Comeback",bg:"#6BABDF",fg:"#114E80"},
+  {ym:"2026-08",name:"Comeback",bg:"#6BABDF",fg:"#114E80"},
+  {ym:"2026-09",name:"Comeback",bg:"#6BABDF",fg:"#114E80"},
+  {ym:"2026-10",name:"Comeback",bg:"#6BABDF",fg:"#114E80"},
+  {ym:"2026-11",name:"Comeback",bg:"#6BABDF",fg:"#114E80"},
+  {ym:"2026-12",name:"Comeback",bg:"#6BABDF",fg:"#114E80"},
+];
+const gp = d => PHASES.find(p=>p.ym===d.slice(0,7)) || {ym:'',name:'?',bg:'#555',fg:'#ccc'};
+
+const PRESETS = [
+  {l:'Gesamt'},{l:"Sommer '25",f:'2025-06-01',t:'2025-09-30'},
+  {l:'Indoor',f:'2025-10-01',t:'2025-12-31'},{l:'2026',f:'2026-01-01',t:'2026-12-31'},
+  {l:'8 Wo',r:56},{l:'4 Wo',r:28},
+];
+
+const ML = {"01":"Jan","02":"Feb","03":"Mär","04":"Apr","05":"Mai","06":"Jun","07":"Jul","08":"Aug","09":"Sep","10":"Okt","11":"Nov","12":"Dez"};
+
+/* ═══ UTILS ═══ */
+const num = s => { if(!s||s==='--'||s==='-'||s==='') return null; return parseFloat(s.replace(/\./g,'').replace(',','.')); };
+const f = (v,d=0) => v==null?'–':d===0?Math.round(v).toLocaleString('de-DE'):v.toFixed(d).replace('.',',');
+const ft = s => { const h=Math.floor(s/3600),m=Math.floor((s%3600)/60); return h>0?`${h}h ${m}m`:`${m}m`; };
+const trimp = (hr,s) => hr&&s?(s/60)*Math.pow(hr/195,2):0;
+
+function parseTime(s) {
+  if(!s||s==='--') return 0;
+  s = s.trim().replace(',','.');
+  const p = s.split(':');
+  if(p.length===3) return parseInt(p[0])*3600+parseInt(p[1])*60+parseFloat(p[2]);
+  if(p.length===2) return parseInt(p[0])*60+parseFloat(p[1]);
+  return 0;
+}
+
+function parseDate(s) {
+  if(!s) return null;
+  s = s.trim().slice(0,10);
+  // YYYY-MM-DD
+  if(/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  // DD.MM.YYYY
+  const m = s.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+  if(m) return `${m[3]}-${m[2]}-${m[1]}`;
+  return null;
+}
+
+function isoWeek(ds) {
+  const d = new Date(ds+'T12:00:00');
+  const th = new Date(d);
+  th.setDate(th.getDate()+3-((th.getDay()+6)%7));
+  const y1 = new Date(th.getFullYear(),0,4);
+  const w = 1+Math.round(((th-y1)/864e5-(3-(y1.getDay()+6)%7))/7);
+  return `${th.getFullYear()}-W${String(w).padStart(2,'0')}`;
+}
+
+/* ═══ CSV PARSER (RFC 4180) ═══ */
+function parseCSV(text) {
+  text = text.replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+  // Auto-detect delimiter from HEADER only (no quoted fields there)
+  const headerLine = text.split('\n')[0];
+  const sc = headerLine.split(';').length, cm = headerLine.split(',').length;
+  const delim = headerLine.includes('\t') ? '\t' : sc > cm ? ';' : ',';
+
+  // Proper field-aware parser: respects quotes during field splitting
+  function splitRow(line) {
+    const fields = []; let field = '', inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (inQ) {
+        if (ch === '"') {
+          if (i+1 < line.length && line[i+1] === '"') { field += '"'; i++; } // escaped quote
+          else inQ = false;
+        } else field += ch;
+      } else {
+        if (ch === '"') inQ = true;
+        else if (ch === delim) { fields.push(field.trim()); field = ''; }
+        else field += ch;
+      }
+    }
+    fields.push(field.trim());
+    return fields;
+  }
+
+  const lines = text.split('\n');
+  const headers = splitRow(lines[0]);
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    if (!lines[i].trim()) continue;
+    const vals = splitRow(lines[i]);
+    if (vals.length < 5) continue; // skip malformed
+    const obj = {};
+    headers.forEach((h,j) => obj[h] = vals[j] || '');
+    rows.push(obj);
+  }
+  return rows;
+}
+
+function processCSV(text) {
+  const rows = parseCSV(text);
+  const data = [];
+  const seen = new Set();
+  let idCounter = 0;
+
+  for (const r of rows) {
+    const typ = r['Aktivitätstyp'] || '';
+    if (typ.includes('E-Bike') || typ.includes('E-Mountain') || typ.includes('Laufen') || typ.includes('Gehen') || typ.includes('Wandern') || typ.includes('Schwimmen')) continue;
+    if (!typ.includes('Rad') && !typ.includes('Gravel') && !typ.includes('Indoor') && !typ.includes('Cycling')) continue;
+
+    const d = parseDate(r['Datum']);
+    if (!d) continue;
+
+    const km = num(r['Distanz']);
+    if (!km || km <= 0) continue;
+
+    const key = `${d}|${km}|${r['Zeit']}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    const isIndoor = typ.includes('Virtuell') || typ.includes('Indoor');
+    data.push({
+      id: `${d}_${idCounter++}`,
+      d, t: isIndoor?'I':'O',
+      typ, // original type string
+      title: r['Titel'] || '',
+      km, s: parseTime(r['Zeit']),
+      hr: num(r['Ø Herzfrequenz']),
+      v: num(r['Ø Geschwindigkeit']),
+      hm: num(r['Anstieg gesamt']) || 0,
+      rpm: num(r['Ø Trittfrequenz']),
+      cal: num(r['Kalorien']) || 0,
+    });
+  }
+
+  data.sort((a,b) => a.d.localeCompare(b.d));
+  return data;
+}
+
+/* ═══ FILE HANDLING ═══ */
+const uploadZone = document.getElementById('upload-zone');
+const fileInput = document.getElementById('file-input');
+
+uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag'); });
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag'));
+uploadZone.addEventListener('drop', e => { e.preventDefault(); uploadZone.classList.remove('drag'); handleFiles(e.dataTransfer.files); });
+fileInput.addEventListener('change', e => handleFiles(e.target.files));
+
+function handleFiles(files) {
+  for (const file of files) {
+    if (!file.name.endsWith('.csv')) continue;
+    const reader = new FileReader();
+    reader.onload = e => {
+      const data = processCSV(e.target.result);
+      if (data.length === 0) return;
+      // Check if already loaded
+      if (state.files.some(f => f.name === file.name)) {
+        const idx = state.files.findIndex(f => f.name === file.name);
+        state.files[idx].data = data;
+      } else {
+        state.files.push({ name: file.name, data });
+      }
+      state.activeFile = state.files.length - 1;
+      initDateRange();
+      render();
+    };
+    reader.readAsText(file, 'UTF-8');
+  }
+}
+
+function initDateRange() {
+  const data = getActiveData();
+  if (!data.length) return;
+  const dates = data.map(r=>r.d).sort();
+  state.fromDate = dates[0];
+  state.toDate = new Date().toISOString().slice(0,10);
+  state.preset = 0;
+  document.getElementById('from-date').value = state.fromDate;
+  document.getElementById('to-date').value = state.toDate;
+}
+
+function getActiveData() {
+  if (state.activeFile < 0 || !state.files[state.activeFile]) return [];
+  return state.files[state.activeFile].data;
+}
+
+function getFilteredData() {
+  return getActiveData().filter(r => r.d >= state.fromDate && r.d <= state.toDate && !state.excluded.has(r.id));
+}
+
+/* ═══ RENDER ═══ */
+function render() {
+  const hasData = state.files.length > 0;
+  document.getElementById('dashboard').style.display = hasData ? '' : 'none';
+
+  renderFileChips();
+  if (!hasData) return;
+
+  renderPresets();
+  renderRangeInfo();
+  renderKPIs();
+  renderTabs();
+  renderTabContent();
+  renderScore();
+}
+
+function renderFileChips() {
+  const el = document.getElementById('file-list');
+  el.innerHTML = state.files.map((f,i) => `
+    <div class="file-chip ${i===state.activeFile?'active':''}" onclick="selectFile(${i})">
+      <span>${f.name}</span>
+      <span class="count">${f.data.length} Aktivitäten</span>
+      <button class="remove" onclick="event.stopPropagation();removeFile(${i})" title="Entfernen">×</button>
+    </div>
+  `).join('');
+}
+
+function selectFile(i) { state.activeFile = i; state.excluded.clear(); initDateRange(); render(); }
+function removeFile(i) {
+  state.files.splice(i, 1);
+  if (state.activeFile >= state.files.length) state.activeFile = state.files.length - 1;
+  if (state.files.length) initDateRange();
+  render();
+}
+
+function renderPresets() {
+  document.getElementById('presets').innerHTML = PRESETS.map((p,i) =>
+    `<button class="pill ${state.preset===i?'on':''}" onclick="applyPreset(${i})">${p.l}</button>`
+  ).join('');
+}
+
+function applyPreset(i) {
+  state.preset = i;
+  const p = PRESETS[i];
+  const data = getActiveData();
+  if (p.r) {
+    const e = new Date(), s = new Date(e-p.r*864e5);
+    state.fromDate = s.toISOString().slice(0,10);
+    state.toDate = e.toISOString().slice(0,10);
+  } else if (p.f) {
+    state.fromDate = p.f; state.toDate = p.t;
+  } else {
+    // Gesamt
+    const dates = data.map(r=>r.d).sort();
+    state.fromDate = dates[0] || '2025-01-01';
+    state.toDate = new Date().toISOString().slice(0,10);
+  }
+  document.getElementById('from-date').value = state.fromDate;
+  document.getElementById('to-date').value = state.toDate;
+  render();
+}
+
+document.getElementById('from-date').addEventListener('change', e => { state.fromDate = e.target.value; state.preset = -1; render(); });
+document.getElementById('to-date').addEventListener('change', e => { state.toDate = e.target.value; state.preset = -1; render(); });
+
+function renderRangeInfo() {
+  const d = getFilteredData();
+  const days = new Set(d.map(r=>r.d)).size;
+  document.getElementById('range-info').textContent = `${d.length} Aktivitäten · ${days} Tage`;
+}
+
+/* ═══ KPIs ═══ */
+function renderKPIs() {
+  const d = getFilteredData();
+  const km=d.reduce((s,r)=>s+r.km,0), sec=d.reduce((s,r)=>s+r.s,0), hm=d.reduce((s,r)=>s+r.hm,0), cal=d.reduce((s,r)=>s+r.cal,0);
+  const wH=d.filter(r=>r.hr), wV=d.filter(r=>r.v), wR=d.filter(r=>r.rpm);
+  const aHr=wH.length?wH.reduce((s,r)=>s+r.hr,0)/wH.length:null;
+  const aV=wV.length?wV.reduce((s,r)=>s+r.v,0)/wV.length:null;
+  const aR=wR.length?wR.reduce((s,r)=>s+r.rpm,0)/wR.length:null;
+  const weeks=Math.max(1,Math.ceil((new Date(state.toDate)-new Date(state.fromDate))/6048e5));
+
+  const kpis = [
+    {l:'Distanz',v:f(km),u:'km',s:`${d.filter(r=>r.t==='O').length} outdoor · ${d.filter(r=>r.t==='I').length} indoor`},
+    {l:'Fahrzeit',v:ft(sec),u:'',s:`Ø ${ft(d.length?sec/d.length:0)} / Einheit`},
+    {l:'Höhenmeter',v:f(hm),u:'hm',s:''},
+    {l:'Kalorien',v:f(cal),u:'kcal',s:''},
+    {l:'Ø Herzfrequenz',v:f(aHr),u:'bpm',s:''},
+    {l:'Ø Geschwindigkeit',v:f(aV,1),u:'km/h',s:''},
+    {l:'Ø Kadenz',v:f(aR),u:'rpm',s:''},
+    {l:'Ø / Woche',v:f(km/weeks),u:'km',s:''},
+  ];
+
+  document.getElementById('kpi-grid').innerHTML = kpis.map(k => `
+    <div class="kpi">
+      <div class="kpi-label">${k.l}</div>
+      <div class="kpi-val">${k.v}<span class="kpi-unit">${k.u}</span></div>
+      ${k.s?`<div class="kpi-sub">${k.s}</div>`:''}
+    </div>
+  `).join('');
+}
+
+/* ═══ SCORE ═══ */
+function renderScore() {
+  const d = getFilteredData().filter(r=>r.hr&&r.v&&r.s>900&&r.t==='O');
+  const el = document.getElementById('score-display');
+  if (d.length<3) { el.style.display='none'; return; }
+  el.style.display='';
+
+  const effs = d.map(r => { const cpk=r.km>0?r.hm/r.km:0; return r.hr/(r.v+cpk*0.3); });
+  const best=Math.min(...effs), worst=Math.max(...effs), range=worst-best||1;
+  const cur=effs[effs.length-1];
+  const prev=effs.length>=4?effs[effs.length-4]:cur;
+  const sc=v=>Math.round(((worst-v)/range)*100);
+  const trend=cur<prev?'↗':'↘';
+
+  document.getElementById('score-val').textContent = sc(cur);
+  document.getElementById('score-val').style.color = cur<prev?'var(--green)':cur>prev?'var(--orange)':'var(--tx)';
+  document.getElementById('score-sub').textContent = `${trend} Fitness · Peak ${sc(best)}`;
+}
+
+/* ═══ TABS ═══ */
+function renderTabs() {
+  const tabs = [['overview','Übersicht'],['performance','Leistung'],['log','Aktivitäten']];
+  document.getElementById('tabs').innerHTML = tabs.map(([k,l]) =>
+    `<button class="tab ${state.tab===k?'on':''}" onclick="setTab('${k}')">${l}</button>`
+  ).join('');
+}
+function setTab(t) { state.tab = t; render(); }
+
+/* ═══ TAB CONTENT ═══ */
+function renderTabContent() {
+  const el = document.getElementById('tab-content');
+  // Destroy old charts
+  Object.values(state.charts).forEach(c => c.destroy?.());
+  state.charts = {};
+
+  if (state.tab === 'overview') renderOverview(el);
+  else if (state.tab === 'performance') renderPerformance(el);
+  else renderLog(el);
+}
+
+/* ═══ OVERVIEW ═══ */
+function renderOverview(el) {
+  el.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div class="pill-group" id="metric-pills"></div>
+      <div class="pill-group" id="view-pills"></div>
+    </div>
+    <div class="chart-wrap"><canvas id="vol-chart" height="200"></canvas></div>
+    <div class="sec-title" style="margin-top:24px">Aktivitäts-Heatmap</div>
+    <div class="heatmap" id="heatmap"></div>
+    <div style="display:flex;gap:3px;align-items:center;margin-top:4px;font-size:9px;color:var(--tx3)">
+      <span>wenig</span>
+      <div class="hm-cell" style="background:var(--bg3)"></div>
+      <div class="hm-cell" style="background:rgba(46,166,106,.2)"></div>
+      <div class="hm-cell" style="background:rgba(46,166,106,.45)"></div>
+      <div class="hm-cell" style="background:rgba(46,166,106,.7)"></div>
+      <div class="hm-cell" style="background:rgba(46,166,106,.92)"></div>
+      <span>viel</span>
+    </div>
+    <div class="sec-title" style="margin-top:28px">Herzfrequenz-Zonen</div>
+    <div class="zone-bar" id="zone-bar"></div>
+    <div id="zone-detail"></div>
+  `;
+
+  // Metric pills
+  const metrics = [['km','Distanz'],['hours','Zeit'],['hm','Höhe'],['trimp','TRIMP'],['n','Einh.']];
+  document.getElementById('metric-pills').innerHTML = metrics.map(([k,l]) =>
+    `<button class="pill ${state.metric===k?'on':''}" onclick="setMetric('${k}')">${l}</button>`
+  ).join('');
+
+  const views = [['monthly','Mo'],['weekly','Wo']];
+  document.getElementById('view-pills').innerHTML = views.map(([k,l]) =>
+    `<button class="pill ${state.view===k?'on':''}" onclick="setView('${k}')">${l}</button>`
+  ).join('');
+
+  renderVolumeChart();
+  renderHeatmap();
+  renderHRZones();
+}
+
+function setMetric(m) { state.metric = m; render(); }
+function setView(v) { state.view = v; render(); }
+
+function renderVolumeChart() {
+  const d = getFilteredData();
+  const kf = state.view==='weekly' ? r=>isoWeek(r.d) : r=>r.d.slice(0,7);
+  const groups = {};
+  d.forEach(r => {
+    const k = kf(r);
+    if (!groups[k]) groups[k] = {key:k,km:0,hours:0,hm:0,n:0,trimp:0,firstDate:r.d};
+    const g = groups[k];
+    g.km += r.km; g.hours += r.s/3600; g.hm += r.hm; g.n++; g.trimp += trimp(r.hr,r.s);
+  });
+  const agg = Object.values(groups).sort((a,b)=>a.key.localeCompare(b.key));
+
+  const labels = agg.map(g => {
+    if (state.view==='monthly') { const mm=g.key.slice(5,7); const yr=g.key.slice(0,4); return (ML[mm]||mm)+(mm==='01'||mm==='06'?" '"+yr.slice(2):''); }
+    return 'KW'+g.key.split('-W')[1];
+  });
+  const vals = agg.map(g => Math.round(g[state.metric]*10)/10);
+  const colors = agg.map(g => gp(g.firstDate).bg);
+
+  const ctx = document.getElementById('vol-chart').getContext('2d');
+  state.charts.vol = new Chart(ctx, {
+    type:'bar',
+    data:{ labels, datasets:[{ data:vals, backgroundColor:colors, borderRadius:4, maxBarThickness:state.view==='weekly'?16:36 }]},
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{
+        backgroundColor:'#161b22',borderColor:'#30363d',borderWidth:1,titleColor:'#e6edf3',bodyColor:'#9aa5b4',
+        padding:12,cornerRadius:8,titleFont:{family:'DM Sans',weight:600},bodyFont:{family:'DM Sans'},
+        callbacks:{
+          title:ctx=>ctx[0]?.label||'',
+          label:ctx=>{const u={km:'km',hours:'h',hm:'hm',trimp:'TRIMP',n:''}; return`${f(ctx.raw,ctx.raw%1?1:0)} ${u[state.metric]||''}`;}
+        }
+      }},
+      scales:{
+        x:{grid:{display:false},ticks:{font:{family:'DM Sans',size:10},color:'#626d7a',maxRotation:state.view==='weekly'?45:0}},
+        y:{grid:{color:'rgba(128,128,128,.06)',drawBorder:false},ticks:{font:{family:'DM Sans',size:10},color:'#626d7a'},beginAtZero:true}
+      }
+    }
+  });
+}
+
+function renderHeatmap() {
+  const d = getFilteredData();
+  const dm = {};
+  d.forEach(r => { if(!dm[r.d]) dm[r.d]={km:0,n:0}; dm[r.d].km+=r.km; dm[r.d].n++; });
+
+  const start = new Date(state.fromDate);
+  const end = new Date(Math.min(new Date(state.toDate).getTime(), Date.now()));
+  const el = document.getElementById('heatmap');
+  let html = '';
+
+  let cur = new Date(start);
+  cur.setDate(cur.getDate() - ((cur.getDay()+6)%7)); // Monday
+
+  while (cur <= end) {
+    html += '<div class="hm-col">';
+    for (let i=0; i<7; i++) {
+      const ds = cur.toISOString().slice(0,10);
+      const ok = cur >= start && cur <= end;
+      const day = dm[ds];
+      const int = day ? Math.min(1, day.km/70) : 0;
+      const bg = !ok ? 'transparent' : int===0 ? 'var(--bg3)' : `rgba(46,166,106,${.1+int*.82})`;
+      const border = ok && int===0 ? 'border:1px solid var(--bd2)' : '';
+      const title = day ? `${ds} · ${f(day.km,1)} km · ${day.n}×` : ds;
+      html += `<div class="hm-cell" style="background:${bg};${border}" title="${title}"></div>`;
+      cur.setDate(cur.getDate()+1);
+    }
+    html += '</div>';
+  }
+  el.innerHTML = html;
+}
+
+function renderHRZones() {
+  const d = getFilteredData();
+  const zones = [
+    {n:'Z1',s:'Erholung',lo:0,hi:126,c:'#B0AEA4'},
+    {n:'Z2',s:'Grundlage',lo:126,hi:146,c:'#44C495'},
+    {n:'Z3',s:'Tempo',lo:146,hi:163,c:'#F5C260'},
+    {n:'Z4',s:'Schwelle',lo:163,hi:178,c:'#E88B5A'},
+    {n:'Z5',s:'VO₂max',lo:178,hi:220,c:'#D64545'},
+  ];
+  d.filter(r=>r.hr).forEach(r => {
+    const z = zones.find(z=>r.hr>=z.lo&&r.hr<z.hi);
+    if(z) z.sec = (z.sec||0)+r.s;
+  });
+  const total = zones.reduce((s,z)=>s+(z.sec||0),0)||1;
+  zones.forEach(z => { z.pct = Math.round((z.sec||0)/total*100); z.h = (z.sec||0)/3600; });
+
+  document.getElementById('zone-bar').innerHTML = zones.filter(z=>z.pct>0).map(z =>
+    `<div style="flex:${z.pct};background:${z.c}" title="${z.n}: ${z.pct}%"></div>`
+  ).join('');
+
+  document.getElementById('zone-detail').innerHTML = zones.map(z => `
+    <div class="zone-row">
+      <div class="zone-dot" style="background:${z.c}"></div>
+      <span style="color:var(--tx2);font-weight:500;width:26px">${z.n}</span>
+      <span style="color:var(--tx3)">${z.s}</span>
+      <span class="zone-pct">${z.pct}%</span>
+      <span style="color:var(--tx3);font-size:10px;width:40px;text-align:right">${f(z.h,1)}h</span>
+    </div>
+  `).join('');
+}
+
+/* ═══ PERFORMANCE ═══ */
+function renderPerformance(el) {
+  el.innerHTML = `
+    <div class="sec-title">Effizienz (HF / Geschwindigkeit, höhenbereinigt)</div>
+    <div class="sec-sub">Niedriger = fitter · Punktgröße = Distanz · Linie = 5er Trend</div>
+    <div class="chart-wrap"><canvas id="eff-chart" height="240"></canvas></div>
+    <div class="sec-title" style="margin-top:32px">Speed & Herzfrequenz (Outdoor ≥ 20 km)</div>
+    <div class="chart-wrap"><canvas id="speed-chart" height="200"></canvas></div>
+    <div class="sec-title" style="margin-top:32px">Kadenz-Entwicklung</div>
+    <div class="chart-wrap"><canvas id="cad-chart" height="150"></canvas></div>
+    <div class="sec-title" style="margin-top:32px">Trainingsbelastung (TRIMP)</div>
+    <div class="sec-sub">Dauer × (HF / MaxHF)² — höher = intensiver</div>
+    <div class="chart-wrap"><canvas id="trimp-chart" height="150"></canvas></div>
+  `;
+
+  renderEffChart();
+  renderSpeedChart();
+  renderCadChart();
+  renderTrimpChart();
+}
+
+function renderEffChart() {
+  const d = getFilteredData().filter(r=>r.hr&&r.v&&r.s>900);
+  const pts = d.map(r => {
+    const cpk=r.km>0?r.hm/r.km:0;
+    const adj = r.hr/(r.v+cpk*0.3);
+    const ph = gp(r.d);
+    return { x: r.d, y: Math.round(adj*100)/100, km:r.km, c:ph.bg, indoor:r.t==='I', r:Math.max(3,Math.min(9,r.km/8)) };
+  });
+
+  // Rolling average (outdoor only)
+  const outPts = pts.filter(p=>!p.indoor);
+  const rolling = outPts.map((p,i) => {
+    const win = outPts.slice(Math.max(0,i-2),i+3);
+    return { x:p.x, y: Math.round(win.reduce((s,w)=>s+w.y,0)/win.length*100)/100 };
+  });
+
+  const labels = pts.map(p=>p.x.slice(5).replace('-','.'));
+  const ctx = document.getElementById('eff-chart').getContext('2d');
+
+  state.charts.eff = new Chart(ctx, {
+    type:'scatter',
+    data:{
+      datasets:[
+        {
+          label:'Trend',type:'line',
+          data:rolling.map(p=>({x:pts.findIndex(pp=>pp.x===p.x),y:p.y})),
+          borderColor:'#2ea66a',borderWidth:2,pointRadius:0,tension:.3,fill:false,order:1
+        },
+        {
+          label:'Effizienz',
+          data:pts.map((p,i)=>({x:i,y:p.y})),
+          backgroundColor:pts.map(p=>p.indoor?'rgba('+hexToRgb(p.c)+',0.25)':p.c),
+          pointRadius:pts.map(p=>p.r),
+          pointHoverRadius:pts.map(p=>p.r+2),
+          order:2
+        }
+      ]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{
+        backgroundColor:'#161b22',borderColor:'#30363d',borderWidth:1,padding:12,cornerRadius:8,
+        titleFont:{family:'DM Sans',weight:600},bodyFont:{family:'DM Sans'},titleColor:'#e6edf3',bodyColor:'#9aa5b4',
+        callbacks:{
+          title:ctx=>{const i=ctx[0]?.dataIndex;return pts[i]?pts[i].x+' · '+gp(pts[i].x).name+(pts[i].indoor?' (Indoor)':''):'';},
+          label:ctx=>{const i=ctx.dataIndex;const p=pts[i];return p?[`Effizienz: ${f(p.y,2)}`,`${f(p.km,1)} km`]:'';}
+        }
+      }},
+      scales:{
+        x:{grid:{color:'rgba(128,128,128,.04)'},ticks:{font:{family:'DM Sans',size:9},color:'#626d7a',callback:(v,i)=>i%Math.max(1,Math.floor(pts.length/12))===0?labels[i]:''}},
+        y:{reverse:true,min:5,max:9.5,grid:{color:'rgba(128,128,128,.06)'},ticks:{font:{family:'DM Sans',size:10},color:'#626d7a'},
+          title:{display:true,text:'← fitter',font:{family:'DM Sans',size:9},color:'#626d7a'}}
+      }
+    }
+  });
+}
+
+function renderSpeedChart() {
+  const d = getFilteredData().filter(r=>r.t==='O'&&r.km>=20&&r.hr&&r.v);
+  if(!d.length) return;
+  const labels = d.map(r=>r.d.slice(5).replace('-','.'));
+  const ctx = document.getElementById('speed-chart').getContext('2d');
+
+  state.charts.speed = new Chart(ctx, {
+    type:'line',
+    data:{
+      labels,
+      datasets:[
+        {label:'km/h',data:d.map(r=>r.v),borderColor:'#2ea66a',backgroundColor:'rgba(46,166,106,.06)',fill:true,borderWidth:2.5,pointRadius:3.5,pointBackgroundColor:'#2ea66a',tension:.3,yAxisID:'v'},
+        {label:'bpm',data:d.map(r=>r.hr),borderColor:'#D64545',borderWidth:1.5,borderDash:[5,3],pointRadius:2.5,pointBackgroundColor:'#D64545',tension:.3,yAxisID:'hr'},
+      ]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:true,labels:{font:{family:'DM Sans',size:11},color:'#9aa5b4',usePointStyle:true,pointStyle:'circle'}},
+        tooltip:{backgroundColor:'#161b22',borderColor:'#30363d',borderWidth:1,padding:12,cornerRadius:8,titleFont:{family:'DM Sans',weight:600},bodyFont:{family:'DM Sans'},titleColor:'#e6edf3',bodyColor:'#9aa5b4',
+          callbacks:{title:ctx=>{const i=ctx[0]?.dataIndex;return d[i]?`${f(d[i].km,1)} km · ${d[i].hm} hm`:'';}}
+      }},
+      scales:{
+        x:{grid:{display:false},ticks:{font:{family:'DM Sans',size:9},color:'#626d7a'}},
+        v:{position:'left',min:12,max:28,grid:{color:'rgba(128,128,128,.06)'},ticks:{font:{family:'DM Sans',size:10},color:'#2ea66a'}},
+        hr:{position:'right',min:120,max:180,grid:{display:false},ticks:{font:{family:'DM Sans',size:10},color:'#D64545'}},
+      }
+    }
+  });
+}
+
+function renderCadChart() {
+  const d = getFilteredData().filter(r=>r.rpm&&r.s>600);
+  const mo = {};
+  d.forEach(r => { const k=r.d.slice(0,7); if(!mo[k])mo[k]=[]; mo[k].push(r.rpm); });
+  const keys = Object.keys(mo).sort();
+  if(keys.length<2) return;
+
+  const labels = keys.map(k=>{const mm=k.slice(5,7);return ML[mm]||mm;});
+  const vals = keys.map(k=>Math.round(mo[k].reduce((s,v)=>s+v,0)/mo[k].length));
+  const colors = keys.map(k=>gp(k+'-01').bg);
+
+  const ctx = document.getElementById('cad-chart').getContext('2d');
+  state.charts.cad = new Chart(ctx, {
+    type:'bar',
+    data:{ labels, datasets:[{data:vals,backgroundColor:colors,borderRadius:4,maxBarThickness:28}]},
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{backgroundColor:'#161b22',borderColor:'#30363d',borderWidth:1,padding:12,cornerRadius:8,titleFont:{family:'DM Sans'},bodyFont:{family:'DM Sans'},titleColor:'#e6edf3',bodyColor:'#9aa5b4',callbacks:{label:ctx=>`${ctx.raw} rpm`}},
+        annotation: undefined
+      },
+      scales:{
+        x:{grid:{display:false},ticks:{font:{family:'DM Sans',size:10},color:'#626d7a'}},
+        y:{min:50,max:95,grid:{color:'rgba(128,128,128,.06)'},ticks:{font:{family:'DM Sans',size:10},color:'#626d7a'}}
+      }
+    }
+  });
+}
+
+function renderTrimpChart() {
+  const d = getFilteredData();
+  const kf = state.view==='weekly'?r=>isoWeek(r.d):r=>r.d.slice(0,7);
+  const groups = {};
+  d.forEach(r => { const k=kf(r); if(!groups[k])groups[k]={key:k,trimp:0,first:r.d}; groups[k].trimp+=trimp(r.hr,r.s); });
+  const agg = Object.values(groups).sort((a,b)=>a.key.localeCompare(b.key));
+
+  const labels = agg.map(g => {
+    if(state.view==='monthly'){const mm=g.key.slice(5,7);return ML[mm]||mm;}
+    return 'KW'+g.key.split('-W')[1];
+  });
+  const vals = agg.map(g=>Math.round(g.trimp));
+
+  const ctx = document.getElementById('trimp-chart').getContext('2d');
+  state.charts.trimp = new Chart(ctx, {
+    type:'line',
+    data:{ labels, datasets:[{data:vals,borderColor:'#db61a2',backgroundColor:'rgba(219,97,162,.08)',fill:true,borderWidth:2,pointRadius:2.5,pointBackgroundColor:'#db61a2',tension:.3}]},
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{backgroundColor:'#161b22',borderColor:'#30363d',borderWidth:1,padding:12,cornerRadius:8,titleFont:{family:'DM Sans'},bodyFont:{family:'DM Sans'},titleColor:'#e6edf3',bodyColor:'#9aa5b4',callbacks:{label:ctx=>`TRIMP: ${ctx.raw}`}}},
+      scales:{
+        x:{grid:{display:false},ticks:{font:{family:'DM Sans',size:10},color:'#626d7a'}},
+        y:{grid:{color:'rgba(128,128,128,.06)'},ticks:{font:{family:'DM Sans',size:10},color:'#626d7a'},beginAtZero:true}
+      }
+    }
+  });
+}
+
+/* ═══ LOG ═══ */
+function renderLog(el) {
+  const allData = getActiveData().filter(r => r.d >= state.fromDate && r.d <= state.toDate);
+  const activeCount = allData.filter(r => !state.excluded.has(r.id)).length;
+  const exclCount = allData.length - activeCount;
+  el.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <div style="font-size:12px;color:var(--tx3)">${activeCount} Aktivitäten${exclCount?` · <span style="color:var(--orange)">${exclCount} ausgeblendet</span>`:''}</div>
+      ${exclCount?'<button class="pill on" onclick="clearExcludes()" style="font-size:10px;padding:4px 10px;background:var(--orange);cursor:pointer">Alle einblenden</button>':''}
+    </div>
+    <div class="log-wrap"><div class="log-scroll"><table class="log-table">
+      <thead><tr>
+        <th style="width:24px"></th><th>Datum</th><th>Titel</th><th>Phase</th><th></th><th>km</th><th>Zeit</th><th>HR</th><th>km/h</th><th>hm</th><th>rpm</th><th>Eff.</th>
+      </tr></thead>
+      <tbody>
+        ${[...allData].reverse().map(r => {
+          const ph = gp(r.d);
+          const eff = (r.hr&&r.v) ? r.hr/(r.v+(r.km>0?r.hm/r.km:0)*0.3) : null;
+          const effColor = eff&&eff<6.5?'color:var(--green)':eff&&eff>7.5?'color:var(--tx3)':'';
+          const excl = state.excluded.has(r.id);
+          const rowStyle = excl ? 'opacity:.35;text-decoration:line-through;' : '';
+          const shortTitle = r.title.length > 24 ? r.title.slice(0,22)+'…' : r.title;
+          return `<tr style="${rowStyle}">
+            <td style="padding:4px 4px;text-align:center">
+              <input type="checkbox" ${excl?'':'checked'} onchange="toggleExclude('${r.id}')" title="${excl?'Einblenden':'Ausblenden'}" style="cursor:pointer;accent-color:var(--green)">
+            </td>
+            <td>${r.d.slice(8)}.${r.d.slice(5,7)}.${r.d.slice(2,4)}</td>
+            <td style="font-size:11px;color:var(--tx2);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.title}">${shortTitle}</td>
+            <td><span class="phase-pill" style="background:${ph.bg};color:${ph.fg}">${ph.name}</span></td>
+            <td style="font-size:9px;color:var(--tx3)">${r.t==='O'?'OUT':'IND'}</td>
+            <td>${f(r.km,1)}</td>
+            <td style="color:var(--tx2)">${ft(r.s)}</td>
+            <td>${r.hr||'–'}</td>
+            <td>${r.v?f(r.v,1):'–'}</td>
+            <td>${r.hm>0?f(r.hm):'–'}</td>
+            <td>${r.rpm||'–'}</td>
+            <td style="font-weight:500;${effColor}">${eff?f(eff,2):'–'}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table></div></div>
+  `;
+}
+
+function toggleExclude(id) {
+  if (state.excluded.has(id)) state.excluded.delete(id);
+  else state.excluded.add(id);
+  render();
+}
+
+function clearExcludes() {
+  state.excluded.clear();
+  render();
+}
+
+/* ═══ HELPERS ═══ */
+function hexToRgb(hex) {
+  const r = parseInt(hex.slice(1,3),16);
+  const g = parseInt(hex.slice(3,5),16);
+  const b = parseInt(hex.slice(5,7),16);
+  return `${r},${g},${b}`;
+}
+
+// Chart.js defaults
+Chart.defaults.font.family = 'DM Sans';
+Chart.defaults.color = '#626d7a';
+
+// Init
+render();
+</script>
+</body>
+</html>
